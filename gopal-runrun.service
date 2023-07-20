@@ -1,0 +1,14 @@
+[Unit]
+Description=DATN-server
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/java -jar ~/datn/server/gopalrunrun-server-0.0.1-SNAPSHOT.jar
+WorkingDirectory=~/datn/server
+User=gopal
+Restart=always
+RestartSec=10
+SyslogIdentifier=datn
+
+[Install]
+WantedBy=multi-user.target

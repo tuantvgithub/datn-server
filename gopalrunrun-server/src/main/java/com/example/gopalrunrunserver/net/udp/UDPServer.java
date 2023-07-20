@@ -75,9 +75,57 @@ public class UDPServer {
             case CS_BROADCAST_MOVE_IN_GAME:
                 handleCSBroadcastMoveInGame(params);
                 break;
+            case CS_UPDATE_POS_IN_GAME:
+                handleCSUpdatePosInGame(params);
+                break;
+            case CS_UPDATE_POS_IN_ROOM:
+                handleCSUpdatePosInRoom(params);
+                break;
             default:
                 throw new NetworkException("Invalid message");
         }
+    }
+
+    // cs: code;sessionId;pos_x;pos_y
+    // sc: code;sessionId;pos_x;pos_y
+    private void handleCSUpdatePosInGame(String[] params) {
+        final String excludeSessionId = params[GConstant.SESSION_IDX];
+        final Set<String> broadcastSessionIds = roomService.getAllPlayerSessionInMyRoom(excludeSessionId)
+                .stream().filter(item -> !item.equals(excludeSessionId))
+                .collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(broadcastSessionIds)) return;
+        final String msg = UDPCommand.SC_UPDATE_POS_IN_GAME.getCode() + GConstant.DATA_SEPARATED +
+                excludeSessionId + GConstant.DATA_SEPARATED + params[2] + GConstant.DATA_SEPARATED + params[3];
+        final byte[] sc = msg.getBytes();
+        broadcastSessionIds.forEach(sessionId -> {
+            final DatagramPacket resPacket = new DatagramPacket(sc, sc.length,
+                    mapSessionId2ClientAddress.get(sessionId), mapSessionId2ClientPort.get(sessionId));
+            try {
+                serverSocket.send(resPacket);
+            } catch (IOException e) {
+                throw new NetworkException(e.getMessage());
+            }
+        });
+    }
+
+    private void handleCSUpdatePosInRoom(String[] params) {
+        final String excludeSessionId = params[GConstant.SESSION_IDX];
+        final Set<String> broadcastSessionIds = roomService.getAllPlayerSessionInMyRoom(excludeSessionId)
+                .stream().filter(item -> !item.equals(excludeSessionId))
+                .collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(broadcastSessionIds)) return;
+        final String msg = UDPCommand.SC_UPDATE_POS_IN_ROOM.getCode() + GConstant.DATA_SEPARATED +
+                excludeSessionId + GConstant.DATA_SEPARATED + params[2] + GConstant.DATA_SEPARATED + params[3];
+        final byte[] sc = msg.getBytes();
+        broadcastSessionIds.forEach(sessionId -> {
+            final DatagramPacket resPacket = new DatagramPacket(sc, sc.length,
+                    mapSessionId2ClientAddress.get(sessionId), mapSessionId2ClientPort.get(sessionId));
+            try {
+                serverSocket.send(resPacket);
+            } catch (IOException e) {
+                throw new NetworkException(e.getMessage());
+            }
+        });
     }
 
     /**
