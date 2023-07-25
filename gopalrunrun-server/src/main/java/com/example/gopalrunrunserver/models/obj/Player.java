@@ -11,7 +11,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class Player {
     private String sessionId;
-    private int isChicken;
+    private int isSnail;
     private float posX;
     private float posY;
 }

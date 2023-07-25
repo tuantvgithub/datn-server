@@ -1,73 +1,81 @@
 package com.example.gopalrunrunserver.net;
 
+import com.example.gopalrunrunserver.game.GameManager;
 import com.example.gopalrunrunserver.net.tcp.ClientHandler;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Component
+@Slf4j
 public class GSessionManager {
-    private final Set<String> tcpSessionIds = new HashSet<>();
-    private final Set<String> udpSessionIds = new HashSet<>();
-    private int sessionSequence = 1;
-    private final Map<String, ClientHandler> mapSessionId2ClientHandler = new ConcurrentHashMap<>();
-    private final Map<String, Long> mapSessionId2ExpiredTime = new ConcurrentHashMap<>();
+  private final Set<String> tcpSessionIds = new HashSet<>();
+  private int sessionSequence = 1;
+  private final Map<String, ClientHandler> mapSessionId2ClientHandler = new ConcurrentHashMap<>();
+  private final Map<String, Long> mapSessionId2ExpiredTime = new ConcurrentHashMap<>();
 
-    @Scheduled(fixedDelay = 10000)
-    private void killTimeoutSession() throws IOException {
-        final long current = System.currentTimeMillis();
-        for (Map.Entry<String, Long> entry : mapSessionId2ExpiredTime.entrySet()) {
-            if (current >= entry.getValue()) {
-                disconnect(entry.getKey());
-            }
-        }
+  private static GSessionManager instance;
+
+  private GSessionManager() {
+  }
+
+  public static GSessionManager getInstance() {
+    if (instance == null) instance = new GSessionManager();
+    return instance;
+  }
+
+//  @Scheduled(fixedDelay = 10000)
+  private void killTimeoutSession() throws IOException {
+    final long current = System.currentTimeMillis();
+    for (Map.Entry<String, Long> entry : mapSessionId2ExpiredTime.entrySet()) {
+      if (current >= entry.getValue()) {
+        disconnect(entry.getKey());
+      }
     }
+  }
 
-    public void refreshSessionTimeout(String sessionId) {
-        mapSessionId2ExpiredTime.put(sessionId, System.currentTimeMillis() + 10000L);
-    }
+  public void refreshSessionTimeout(String sessionId) {
+    mapSessionId2ExpiredTime.put(sessionId, System.currentTimeMillis() + 10000L);
+  }
 
-    public String initSession() {
-        final String sessionId = String.valueOf(sessionSequence);
-        sessionSequence += 1;
-        tcpSessionIds.add(sessionId);
-        mapSessionId2ExpiredTime.put(sessionId, System.currentTimeMillis() + 10000L);
+  public String initSession() {
+    final String sessionId = String.valueOf(sessionSequence);
+    sessionSequence += 1;
+    tcpSessionIds.add(sessionId);
+    mapSessionId2ExpiredTime.put(sessionId, System.currentTimeMillis() + 10000L);
 
-        return sessionId;
-    }
+    return sessionId;
+  }
 
-    public void registerDataOutputStream(String sessionId, ClientHandler clientHandler) {
-        mapSessionId2ClientHandler.put(sessionId, clientHandler);
-    }
+  public void registerDataOutputStream(String sessionId, ClientHandler clientHandler) {
+    mapSessionId2ClientHandler.put(sessionId, clientHandler);
+  }
 
-    public DataOutputStream getTcpOutputStreamBy(String sessionId) {
-        return mapSessionId2ClientHandler.get(sessionId).getOut();
-    }
+  public void sendTCPMessage(String sc, String sessionId) {
+    if (!mapSessionId2ClientHandler.containsKey(sessionId)) return;
+    mapSessionId2ClientHandler.get(sessionId).send2Client(sc);
+  }
 
-    public void initUdp(String sessionId) {
-        if (tcpSessionIds.contains(sessionId))
-            udpSessionIds.add(sessionId);
-    }
+  public void sendTCPMessage(byte[] sc, int len, String sessionId) {
+    if (!mapSessionId2ClientHandler.containsKey(sessionId)) return;
+    mapSessionId2ClientHandler.get(sessionId).send2Client(sc, len);
+  }
 
-    public boolean tcpSessionIsNotValid(String sessionId) {
-        return !tcpSessionIds.contains(sessionId);
-    }
+  public boolean tcpSessionIsNotValid(String sessionId) {
+    return !tcpSessionIds.contains(sessionId);
+  }
 
-    public boolean udpSessionIsNotValid(String sessionId) {
-        return !udpSessionIds.contains(sessionId);
-    }
-
-    public void disconnect(String sessionId) throws IOException {
-        mapSessionId2ExpiredTime.remove(sessionId);
-        udpSessionIds.remove(sessionId);
-        tcpSessionIds.remove(sessionId);
-        mapSessionId2ClientHandler.get(sessionId).close();
-        mapSessionId2ClientHandler.remove(sessionId);
-    }
+  public void disconnect(String sessionId) throws IOException {
+    log.info("Disconnect session: " + sessionId);
+    mapSessionId2ExpiredTime.remove(sessionId);
+    tcpSessionIds.remove(sessionId);
+    mapSessionId2ClientHandler.get(sessionId).close();
+    mapSessionId2ClientHandler.remove(sessionId);
+    GameManager.getInstance().outRoom(sessionId);
+    GameManager.getInstance().outGame(sessionId);
+  }
 }

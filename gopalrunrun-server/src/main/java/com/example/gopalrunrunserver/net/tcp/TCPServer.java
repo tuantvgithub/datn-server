@@ -1,7 +1,5 @@
 package com.example.gopalrunrunserver.net.tcp;
 
-import com.example.gopalrunrunserver.net.GSessionManager;
-import com.example.gopalrunrunserver.services.RoomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -12,15 +10,11 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class TCPServer {
-  private final GSessionManager gSessionManager;
-  private final RoomService roomService;
-
   private final ThreadPoolTaskExecutor taskExecutor;
 
   public void start(int port) throws IOException {
@@ -30,7 +24,7 @@ public class TCPServer {
       final DataInputStream in = new DataInputStream(socket.getInputStream());
       final DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 
-      final ClientHandler clientHandler = new ClientHandler(in, out, gSessionManager, roomService);
+      final ClientHandler clientHandler = new ClientHandler(in, out);
       taskExecutor.execute(clientHandler::run);
     }
   }
